@@ -13,7 +13,41 @@
 @implementation NSDictionary (MTLJSONKeyPath)
 
 - (id)mtl_valueForJSONKeyPath:(NSString *)JSONKeyPath success:(BOOL *)success error:(NSError **)error {
-	NSArray *components = [JSONKeyPath componentsSeparatedByString:@"."];
+	NSScanner *scanner = [[NSScanner alloc] initWithString:JSONKeyPath];
+	scanner.charactersToBeSkipped = [NSCharacterSet new];
+	
+	NSMutableString *buffer = [NSMutableString new];
+	NSMutableArray *components = [NSMutableArray new];
+	NSCharacterSet *separatorSet = [NSCharacterSet characterSetWithCharactersInString:@"\\."];
+	while (scanner.scanLocation < JSONKeyPath.length) {
+		NSString *result = nil;
+		if ([scanner scanUpToCharactersFromSet:separatorSet intoString:&result])
+			[buffer appendString:result];
+		
+		NSUInteger scanLocation = scanner.scanLocation;
+		if (scanLocation >= JSONKeyPath.length)
+			break;
+		
+		unichar character = [JSONKeyPath characterAtIndex:scanLocation];
+		if (character == '\\') {
+			if (scanLocation + 1 < JSONKeyPath.length) {
+				unichar literal = [JSONKeyPath characterAtIndex:(scanLocation + 1)];
+				if (literal == '.') {
+					[buffer appendString:@"."];
+					scanner.scanLocation = (scanLocation + 2);
+					continue;
+				}
+			}
+			[buffer appendString:@"\\"];
+		} else if (character == '.') {
+			[components addObject:buffer];
+			buffer = [NSMutableString new];
+		}
+		
+		scanner.scanLocation = (scanLocation + 1);
+	}
+	
+	[components addObject:buffer];
 
 	id result = self;
 	for (NSString *component in components) {
